@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>팡런 (PangRun) | 국가 대항전</title>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+    <style>
+        /* CSS는 최종 수정본을 반영했습니다. */
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            overflow: hidden;
+            background-image: url("배경완성.png"); /* <<< 최종 배경 이미지 파일명으로 변경하세요! */
+            background-size: cover; 
+            background-position: left bottom;
+            background-repeat: repeat-x; 
+            transition: background-position 0.1s linear; 
+        }
+
+        /* (수정) 동시 접속자 숨김 */
+        #user-count {
+            display: none; 
+            position: fixed; top: 10px; left: 10px; width: 150px;
+            background-color: rgba(255, 255, 255, 0.9); border: 2px solid #333;
+            border-radius: 8px; padding: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            z-index: 100; text-align: center;
+        }
+        #user-count h3 { margin: 0 0 5px 0; font-size: 14px; }
+        #user-count span { font-size: 20px; font-weight: bold; color: #d90000; }
+
+        /* 오른쪽 위 랭킹 보드 */
+        #leaderboard {
+            position: fixed; top: 10px; right: 10px; width: 200px;
+            background-color: rgba(255, 255, 255, 0.9); border: 2px solid #333;
+            border-radius: 8px; padding: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+        #leaderboard h3 { margin: 0 0 10px 0; text-align: center; }
+        #leaderboard ol { margin: 0; padding-left: 20px; }
+        #leaderboard li { font-size: 16px; margin-bottom: 5px; font-weight: bold; }
+
+        /* 하단 진행바 컨테이너 */
+        #progress-bar-container {
+            position: fixed; bottom: 20px; left: 5%; width: 90%;
+            display: flex; align-items: center; z-index: 100;
+        }
+        #progress-bar-track {
+            width: 100%; height: 25px; background-color: #d0d0d0;
+            border: 2px solid #555; border-radius: 15px; position: relative;
+        }
+        .flag-icon {
+            position: absolute; width: 30px; height: 20px; border: 1px solid #000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.5); top: -10px;
+            transform: translateX(-50%); animation: flag-bounce 1s infinite alternate;
+        }
+        .flag-icon:nth-child(even) { animation-duration: 0.8s; top: -5px; }
+        @keyframes flag-bounce {
+            from { transform: translate(-50%, -5px); }
+            to { transform: translate(-50%, 0px); }
+        }
+
+        /* 중앙 클릭 영역 */
+        #game-area {
+            display: flex; flex-direction: column; justify-content: flex-end; 
+            align-items: center; height: 100vh; cursor: pointer; padding-bottom: 300px;
+        }
+        /* 캐릭터 이미지 스타일 */
+        #character-img { 
+            width: 200px; height: auto; image-rendering: pixelated; 
+            animation: runner-bounce 0.5s infinite alternate; 
+            position: relative; z-index: 100; margin-bottom: 100px;
+        }
+        @keyframes runner-bounce {
+            from { transform: translateY(0px); }
+            to { transform: translateY(-10px); }
+        }
+
+        /* '내가 기여한 거리' (상단 중앙 고정) */
+        #my-stats {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            font-size: 40px; font-weight: bold; color: white; 
+            text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 3px 3px 5px rgba(0,0,0,0.5);
+            z-index: 101;
+        }
+        #click-prompt { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="user-count">
+        <h3>동시 접속자</h3>
+        <span id="users">...</span>
+    </div>
+    <div id="leaderboard">
+        <h3>팡런 (PangRun) 실시간 랭킹</h3>
+        <ol></ol>
+    </div>
+    <div id="progress-bar-container">
+        <div id="progress-bar-track">
+        </div>
+    </div>
+
+    <div id="my-stats">내가 기여한 거리: <span id="my-distance">0</span>m</div>
+
+    <div id="game-area">
+        <img id="character-img" src="달리기.png" alt="러너 캐릭터"> 
+        <div id="click-prompt">화면을 '팡!' 클릭해서 달리기!</div>
+    </div>
+
+    <script>
+        /* JavaScript: v1.4 최종 클라이언트 코드 */
+        
+        // 1. 서버 접속 (★여기에 Render 주소만 넣으면 끝!)
+        const socket = io("YOUR_RENDER_SERVER_URL_HERE"); // ★★★ 여기에 Render 주소를 붙여넣습니다! ★★★
+
+        // 2. HTML 요소들
+        const body = document.body;
+        const gameArea = document.getElementById('game-area');
+        const myDistanceEl = document.getElementById('my-distance'); 
+        const characterImgEl = document.getElementById('character-img');
+        const leaderboardListEl = document.querySelector('#leaderboard ol');
+        const userCountEl = document.getElementById('users');
+        const progressBarTrack = document.getElementById('progress-bar-track'); 
+
+        // 3. 클릭 변수
+        let myTotalDistance = 0;
+        let clicksToSend = 0;
+        let backgroundPositionX = 0; 
+
+        // 4. 클릭 리스너
+        gameArea.addEventListener('click', () => {
+            myTotalDistance++;
+            clicksToSend++;
+            myDistanceEl.textContent = myTotalDistance; 
+            backgroundPositionX -= 5; 
+            body.style.backgroundPositionX = `${backgroundPositionX}px`;
+            characterImgEl.style.transform = 'scale(1.1)'; 
+            setTimeout(() => { characterImgEl.style.transform = 'scale(1)'; }, 100);
+        });
+
+        // 5. 서버로 클릭 전송
+        setInterval(() => {
+            if (clicksToSend > 0) {
+                socket.emit('sendPang', clicksToSend);
+                clicksToSend = 0;
+            }
+        }, 2000);
+
+        /* 6. 국기 이미지 매퍼 (실제 flagcdn.com 주소 사용) */
+        const flagImageMapper = {
+            '🇰🇷': 'https://flagcdn.com/w40/kr.png',
+            '🇯🇵': 'https://flagcdn.com/w40/jp.png',
+            '🇺🇸': 'https://flagcdn.com/w40/us.png',
+            '🇨🇳': 'https://flagcdn.com/w40/cn.png',
+            '🇹🇼': 'https://flagcdn.com/w40/tw.png',
+            '🇩🇪': 'https://flagcdn.com/w40/de.png',
+            '🇫🇷': 'https://flagcdn.com/w40/fr.png',
+            '👽': 'https://placehold.co/30x20/808080/FFFFFF?text=ETC' // '기타'는 임시 이미지
+        };
+
+        /* 7. 서버로부터 랭킹 받기 */
+        socket.on('updateRanking', (payload) => {
+            
+            const countriesData = payload.ranking;
+            const userCount = payload.users; // 이 값은 지금 사용하지 않음
+
+            // 랭킹판 업데이트
+            leaderboardListEl.innerHTML = ''; 
+            countriesData.forEach(country => {
+                const newRankItem = document.createElement('li');
+                newRankItem.textContent = `${country.name}: ${country.distance}m`;
+                leaderboardListEl.appendChild(newRankItem);
+            });
+
+            // 접속자 수 업데이트 (코드는 남겨둠)
+            userCountEl.textContent = userCount.toLocaleString();
+            
+            // 진행바 업데이트
+            progressBarTrack.innerHTML = ''; 
+            if (countriesData.length === 0) return;
+
+            const firstPlaceData = countriesData[0];
+            const lastPlaceData = countriesData[countriesData.length - 1];
+            let max_distance = firstPlaceData.distance;
+            let min_distance = lastPlaceData.distance;
+            let total_gap = max_distance - min_distance;
+            if (total_gap === 0) { total_gap = 1; min_distance -= 1; }
+
+            countriesData.forEach(country => {
+                const country_distance = country.distance;
+                let percentage = ((country_distance - min_distance) / total_gap) * 100;
+
+                const flagIcon = document.createElement('img');
+                flagIcon.className = 'flag-icon';
+                const flagEmoji = country.name.split(' ')[0];
+                flagIcon.src = flagImageMapper[flagEmoji] || flagImageMapper['👽'];
+                flagIcon.style.left = `${percentage}%`; 
+                progressBarTrack.appendChild(flagIcon);
+            });
+        });
+    </script>
+</body>
+</html>

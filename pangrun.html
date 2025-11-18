@@ -8,21 +8,20 @@
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
     <style>
-        /* CSS는 최종 수정본을 반영했습니다. */
+        
         body {
             font-family: 'Arial', sans-serif;
             margin: 0;
             padding: 0;
             user-select: none;
             overflow: hidden;
-            background-image: url("배경완성.png"); /* <<< 최종 배경 이미지 파일명으로 변경하세요! */
+            background-image: url("배경완성.png"); 
             background-size: cover; 
             background-position: left bottom;
             background-repeat: repeat-x; 
             transition: background-position 0.1s linear; 
         }
 
-        /* (수정) 동시 접속자 숨김 */
         #user-count {
             display: none; 
             position: fixed; top: 10px; left: 10px; width: 150px;
@@ -33,7 +32,7 @@
         #user-count h3 { margin: 0 0 5px 0; font-size: 14px; }
         #user-count span { font-size: 20px; font-weight: bold; color: #d90000; }
 
-        /* 오른쪽 위 랭킹 보드 */
+       
         #leaderboard {
             position: fixed; top: 10px; right: 10px; width: 200px;
             background-color: rgba(255, 255, 255, 0.9); border: 2px solid #333;
@@ -44,7 +43,6 @@
         #leaderboard ol { margin: 0; padding-left: 20px; }
         #leaderboard li { font-size: 16px; margin-bottom: 5px; font-weight: bold; }
 
-        /* 하단 진행바 컨테이너 */
         #progress-bar-container {
             position: fixed; bottom: 20px; left: 5%; width: 90%;
             display: flex; align-items: center; z-index: 100;
@@ -64,12 +62,11 @@
             to { transform: translate(-50%, 0px); }
         }
 
-        /* 중앙 클릭 영역 */
         #game-area {
             display: flex; flex-direction: column; justify-content: flex-end; 
             align-items: center; height: 100vh; cursor: pointer; padding-bottom: 300px;
         }
-        /* 캐릭터 이미지 스타일 */
+      
         #character-img { 
             width: 200px; height: auto; image-rendering: pixelated; 
             animation: runner-bounce 0.5s infinite alternate; 
@@ -80,7 +77,7 @@
             to { transform: translateY(-10px); }
         }
 
-        /* '내가 기여한 거리' (상단 중앙 고정) */
+       
         #my-stats {
             position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
             font-size: 40px; font-weight: bold; color: white; 
@@ -113,12 +110,12 @@
     </div>
 
     <script>
-        /* JavaScript: v1.4 최종 클라이언트 코드 */
+      
         
-        // 1. 서버 접속 (★여기에 Render 주소만 넣으면 끝!)
-        const socket = io("YOUR_RENDER_SERVER_URL_HERE"); // ★★★ 여기에 Render 주소를 붙여넣습니다! ★★★
+       
+        const socket = io("https://pangrun-site.onrender.com"); 
 
-        // 2. HTML 요소들
+      
         const body = document.body;
         const gameArea = document.getElementById('game-area');
         const myDistanceEl = document.getElementById('my-distance'); 
@@ -127,12 +124,12 @@
         const userCountEl = document.getElementById('users');
         const progressBarTrack = document.getElementById('progress-bar-track'); 
 
-        // 3. 클릭 변수
+      
         let myTotalDistance = 0;
         let clicksToSend = 0;
         let backgroundPositionX = 0; 
 
-        // 4. 클릭 리스너
+       
         gameArea.addEventListener('click', () => {
             myTotalDistance++;
             clicksToSend++;
@@ -143,7 +140,7 @@
             setTimeout(() => { characterImgEl.style.transform = 'scale(1)'; }, 100);
         });
 
-        // 5. 서버로 클릭 전송
+       
         setInterval(() => {
             if (clicksToSend > 0) {
                 socket.emit('sendPang', clicksToSend);
@@ -151,7 +148,6 @@
             }
         }, 2000);
 
-        /* 6. 국기 이미지 매퍼 (실제 flagcdn.com 주소 사용) */
         const flagImageMapper = {
             '🇰🇷': 'https://flagcdn.com/w40/kr.png',
             '🇯🇵': 'https://flagcdn.com/w40/jp.png',
@@ -160,16 +156,16 @@
             '🇹🇼': 'https://flagcdn.com/w40/tw.png',
             '🇩🇪': 'https://flagcdn.com/w40/de.png',
             '🇫🇷': 'https://flagcdn.com/w40/fr.png',
-            '👽': 'https://placehold.co/30x20/808080/FFFFFF?text=ETC' // '기타'는 임시 이미지
+            '👽': 'https://placehold.co/30x20/808080/FFFFFF?text=ETC' 
         };
 
-        /* 7. 서버로부터 랭킹 받기 */
+        
         socket.on('updateRanking', (payload) => {
             
             const countriesData = payload.ranking;
-            const userCount = payload.users; // 이 값은 지금 사용하지 않음
+            const userCount = payload.users; 
 
-            // 랭킹판 업데이트
+            
             leaderboardListEl.innerHTML = ''; 
             countriesData.forEach(country => {
                 const newRankItem = document.createElement('li');
@@ -177,10 +173,10 @@
                 leaderboardListEl.appendChild(newRankItem);
             });
 
-            // 접속자 수 업데이트 (코드는 남겨둠)
+          
             userCountEl.textContent = userCount.toLocaleString();
             
-            // 진행바 업데이트
+            
             progressBarTrack.innerHTML = ''; 
             if (countriesData.length === 0) return;
 
@@ -205,4 +201,5 @@
         });
     </script>
 </body>
+
 </html>

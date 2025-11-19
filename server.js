@@ -6,19 +6,20 @@ const redis = require('redis');
 const path = require('path');
 
 const app = express();
+// ✨ 1. Render 환경 포트 설정
+const PORT = process.env.PORT || 3000;
 
-// --- (신규!) 웹 브라우저 접속 라우트 설정 ---
+// 웹 브라우저 접속 라우트 설정
 app.use(express.static(path.join(__dirname, '/')));
 app.get('/', (req, res) => {
+    // pangrun.html 파일이 최상위 폴더에 있다면 이 경로는 정상입니다.
     res.sendFile(path.join(__dirname, 'pangrun.html'));
 });
-// ------------------------------------
 
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: { origin: "*", methods: ["GET", "POST"] }
 });
-const PORT = 3000;
 
 const redisClient = redis.createClient();
 redisClient.on('error', err => console.log('Redis Client Error', err));
@@ -53,6 +54,8 @@ io.on('connection', (socket) => {
     
     console.log(`유저 접속: ${userCountryName} (IP: ${ip})`);
     
+    // (초기 접속 시 랭킹 데이터를 한 번 보내서 UI가 즉시 업데이트되도록 돕는 코드가 필요할 수 있습니다.)
+    
     socket.on('sendPang', (clickCount) => {
         redisClient.hIncrBy('pangrun_scores', socket.countryName, clickCount);
     });
@@ -83,6 +86,7 @@ setInterval(async () => {
 
 }, 1000);
 
+// ✨ 2. 수정된 PORT 변수 사용
 server.listen(PORT, () => {
-    console.log(`(v1.4) 팡런 'Redis' 서버가 http://localhost:${PORT} 에서 실행 중입니다.`);
+    console.log(`(v1.4) 팡런 'Redis' 서버가 포트 ${PORT} 에서 실행 중입니다.`);
 });
